@@ -158,9 +158,7 @@ then
 	build_types=(Debug Release)
 	android_toolchains=(arm-linux-androideabi-4.9 aarch64-linux-android-4.9 x86-4.9 x86_64-4.9)
 
-	export ANDROID_NDK="/home/popper/bin/Android/Ndk"
-	export ANDROID_SDK="/home/popper/bin/Android/Sdk"
-	export GODOT_DIR="~/git/others_gits/godot"
+	export GODOT_DIR=../godot
 
 	rm -r bin
 
@@ -169,9 +167,9 @@ then
 		# If we are building for debug then generate the api from the debug editor
 		if [ $build_type == Debug ]
 		then
-			~/git/others_gits/godot/bin/godot_editor_debug --gdnative-generate-json-api godot_headers/api.json
+			$GODOT_DIR/bin/godot_editor_debug --gdnative-generate-json-api godot_headers/api.json
 		else
-			~/git/others_gits/godot/bin/godot_editor --gdnative-generate-json-api godot_headers/api.json
+			$GODOT_DIR/bin/godot_editor --gdnative-generate-json-api godot_headers/api.json
 		fi
 
 		mkdir -p .cmake_build
@@ -189,7 +187,7 @@ then
 			# Build Android version with the defined toolchains
 			mkdir -p Android$build_type$toolchain
 			cd Android$build_type$toolchain
-			$ANDROID_SDK/cmake/3.6.4111459/bin/cmake -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake -DANDROID_TOOLCHAIN_NAME=$toolchain \
+			$ANDROID_SDK/cmake/3.6.4111459/bin/cmake -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake -DANDROID_TOOLCHAIN=clang -DANDROID_TOOLCHAIN_NAME=$toolchain \
 			-DANDROID_PLATFORM=android-23 -DGODOT_HEADERS_DIR=$GODOT_DIR/modules/gdnative/include -DCMAKE_BUILD_TYPE=$build_type ../..
 			cmake --build . -j 4
 			cd ..
