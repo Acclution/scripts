@@ -87,6 +87,9 @@ then
 
 	if [[ $BUILD_TEMPLATES =~ ^[Yy]$ ]]
 	then
+		# Just a marker to show that templates has been built
+		touch bin/has_templates
+
 		# Linux 64bit
 		scons p=x11 use_llvm=yes target=debug tools=no -j 4
 		mv bin/godot.x11.debug.64.llvm bin/linux_x11_64_debug
@@ -210,17 +213,18 @@ then
 	rm -r ~/.local/include/godot
 	cp -r godot/modules/gdnative/include ~/.local/include/godot
 
-	if [[ $BUILD_TEMPLATES =~ ^[Yy]$ ]]
+	if [ -f "godot/bin/has_templates" ]
 	then
 		# Get godot version and remove revision and custom_build from version
 		# version looks like: 3.1.dev.custom_build.6c09cdd
-		version=$(bin/godot_editor --version 2>&1)
+		version=$(godot/bin/godot_editor --version 2>&1)
 		version="${version%.*}" # Removes revision
 		version="${version%.*}" # Removes custom_build
 
 		# Copy templates to template folder
-		rm -r ~/.local/share/godot/templates/$version
-		cp -r bin ~/.local/share/godot/templates/$version
+		mkdir -p ~/.local/share/godot/templates
+		rm -rf ~/.local/share/godot/templates/$version
+		cp -r godot/bin ~/.local/share/godot/templates/$version
 		echo $version > ~/.local/share/godot/templates/$version/version.txt
 	fi
 fi
