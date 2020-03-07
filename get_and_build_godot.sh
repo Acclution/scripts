@@ -29,6 +29,10 @@ read -p "Pull from git? " -n 1 -r
 export GIT_PULL=$REPLY
 printf "\n"
 
+read -p "Change to Branch 3.2? " -n 1 -r
+export GIT_CHANGE_BRANCH=$REPLY
+printf "\n"
+
 read -p "Build godot? " -n 1 -r
 export BUILD_GODOT=$REPLY
 printf "\n"
@@ -36,6 +40,17 @@ printf "\n"
 read -p "Build export templates? " -n 1 -r
 export BUILD_TEMPLATES=$REPLY
 printf "\n"
+
+if [[ $BUILD_TEMPLATES =~ ^[Yy]$ ]]
+then
+	read -p "Build Web? " -n 1 -r
+	export BUILD_WEB=$REPLY
+	printf "\n"
+
+	read -p "Build Android? " -n 1 -r
+	export BUILD_ANDROID=$REPLY
+	printf "\n"
+fi
 
 read -p "Build godot-cpp? " -n 1 -r
 export BUILD_GODOT_CPP=$REPLY
@@ -49,6 +64,7 @@ read -p "Install godot-cpp? " -n 1 -r
 export INSTALL_GODOT_CPP=$REPLY
 printf "\n"
 
+export CORE_COUNT=$(nproc)
 
 #####
 # Godot build
@@ -67,19 +83,28 @@ then
 	  cd godot
 	fi
 
+	if [[ $GIT_CHANGE_BRANCH =~ ^[Yy]$ ]]
+	then
+		git fetch
+		git checkout 3.2
+	else
+		git fetch
+		git checkout master
+	fi
+
 	# Remove old builds
 	rm -f bin/*
 
 	### Build binaries normally
 	# Editor
-	scons p=x11 use_llvm=yes target=release_debug tools=yes -j 4
+	scons p=x11 use_llvm=yes target=release_debug tools=yes -j $CORE_COUNT
 	mv bin/godot.x11.opt.tools.64.llvm bin/godot_editor
-	scons p=x11 use_llvm=yes target=debug tools=yes -j 4
+	scons p=x11 use_llvm=yes target=debug tools=yes -j $CORE_COUNT
 	mv bin/godot.x11.tools.64.llvm bin/godot_editor_debug
 	# Editor Server
-	scons p=server use_llvm=yes target=release_debug tools=yes -j 4
+	scons p=server use_llvm=yes target=release_debug tools=yes -j $CORE_COUNT
 	mv bin/godot_server.x11.opt.tools.64.llvm bin/godot_server_editor
-	scons p=server use_llvm=yes target=debug tools=yes -j 4
+	scons p=server use_llvm=yes target=debug tools=yes -j $CORE_COUNT
 	mv bin/godot_server.x11.tools.64.llvm bin/godot_server_editor_debug
 
 	######
@@ -91,43 +116,51 @@ then
 		touch bin/has_templates
 
 		# Linux 64bit
-		scons p=x11 use_llvm=yes target=debug tools=no -j 4
+		scons p=x11 use_llvm=yes target=debug tools=no -j $CORE_COUNT
 		mv bin/godot.x11.debug.64.llvm bin/linux_x11_64_debug
-		scons p=x11 use_llvm=yes target=release tools=no -j 4
+		scons p=x11 use_llvm=yes target=release tools=no -j $CORE_COUNT
 		mv bin/godot.x11.opt.64.llvm bin/linux_x11_64_release
 
 		# Linux 32bit
-		#scons p=x11 use_llvm=yes tools=no target=release bits=32 -j 4
+		#scons p=x11 use_llvm=yes tools=no target=release bits=32 -j $CORE_COUNT
 		#mv bin/godot.x11.opt.64.llvm bin/linux_x11_32_release
-		#scons p=x11 use_llvm=yes tools=no target=release_debug bits=32 -j 4
+		#scons p=x11 use_llvm=yes tools=no target=release_debug bits=32 -j $CORE_COUNT
 		#mv bin/godot.x11.opt.64.llvm bin/linux_x11_32_debug
 
 		# Linux server
-		scons p=server use_llvm=yes target=debug tools=no -j 4
+		scons p=server use_llvm=yes target=debug tools=no -j $CORE_COUNT
 		mv bin/godot_server.x11.debug.64.llvm bin/linux_server_64_debug
-		scons p=server use_llvm=yes target=release tools=no -j 4
+		scons p=server use_llvm=yes target=release tools=no -j $CORE_COUNT
 		mv bin/godot_server.x11.opt.64.llvm bin/linux_server_64
 
 		# Web
-		source /etc/profile.d/emscripten.sh
-		scons platform=javascript tools=no target=release javascript_eval=no -j 4
-		mv bin/godot.javascript.opt.zip bin/webassembly_release.zip
-		scons platform=javascript tools=no target=release_debug javascript_eval=no -j 4
-		mv bin/godot.javascript.opt.debug.zip bin/webassembly_debug.zip
+		if [[ $BUILD_WEB =~ ^[Yy]$ ]]
+		then
+			source /etc/profile.d/emscripten.sh
+			scons platform=javascript tools=no target=release javascript_eval=no -j $CORE_COUNT
+			mv bin/godot.javascript.opt.zip bin/webassembly_release.zip
+			scons platform=javascript tools=no target=release_debug javascript_eval=no -j $CORE_COUNT
+			mv bin/godot.javascript.opt.debug.zip bin/webassembly_debug.zip
+		fi
 
 		# Android
-		scons p=android target=release android_arch=armv7 -j 4
-		scons p=android target=release android_arch=arm64v8 -j 4
-		scons p=android target=release android_arch=x86 -j 4
-		cd platform/android/java
-		gradle build
-		cd ../../../
-		scons p=android target=release_debug android_arch=armv7 -j 4
-		scons p=android target=release_debug android_arch=arm64v8 -j 4
-		scons p=android target=release_debug android_arch=x86 -j 4
-		cd platform/android/java
-		gradle build
-		cd ../../../
+		if [[ $BUILD_ANDROID =~ ^[Yy]$ ]]
+		then
+			scons p=android target=release android_arch=armv7 -j $CORE_COUNT
+			scons p=android target=release android_arch=arm64v8 -j $CORE_COUNT
+			scons p=android target=release android_arch=x86 -j $CORE_COUNT
+			scons p=android target=release android_arch=x86_64 -j $CORE_COUNT
+			cd platform/android/java
+			./gradlew generateGodotTemplates
+			cd ../../../
+			scons p=android target=release_debug android_arch=armv7 -j $CORE_COUNT
+			scons p=android target=release_debug android_arch=arm64v8 -j $CORE_COUNT
+			scons p=android target=release_debug android_arch=x86 -j $CORE_COUNT
+			scons p=android target=release_debug android_arch=x86_64 -j $CORE_COUNT
+			cd platform/android/java
+			./gradlew generateGodotTemplates
+			cd ../../../
+		fi
 
 		# Cross compile to windows
 		#export MINGW32_PREFIX="/path/to/i686-w64-mingw32-"
@@ -182,19 +215,22 @@ then
 		mkdir -p Linux$build_type
 		cd Linux$build_type
 		cmake -DGODOT_HEADERS_DIR=$GODOT_DIR/modules/gdnative/include -DCMAKE_BUILD_TYPE=$build_type -G Ninja ../..
-		cmake --build . -j 4
+		cmake --build . -j $CORE_COUNT
 		cd ..
 
-		for toolchain in ${android_toolchains[*]}
-		do
-			# Build Android version with the defined toolchains
-			mkdir -p Android$build_type$toolchain
-			cd Android$build_type$toolchain
-			$ANDROID_SDK/cmake/3.6.4111459/bin/cmake -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake -DANDROID_TOOLCHAIN=clang -DANDROID_TOOLCHAIN_NAME=$toolchain \
-			-DANDROID_PLATFORM=android-23 -DGODOT_HEADERS_DIR=$GODOT_DIR/modules/gdnative/include -DCMAKE_BUILD_TYPE=$build_type ../..
-			cmake --build . -j 4
-			cd ..
-		done
+		if [[ $BUILD_ANDROID =~ ^[Yy]$ ]]
+		then
+			for toolchain in ${android_toolchains[*]}
+			do
+				# Build Android version with the defined toolchains
+				mkdir -p Android$build_type$toolchain
+				cd Android$build_type$toolchain
+				$ANDROID_SDK/cmake/3.6.4111459/bin/cmake -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake -DANDROID_TOOLCHAIN=clang -DANDROID_TOOLCHAIN_NAME=$toolchain \
+				-DANDROID_PLATFORM=android-23 -DGODOT_HEADERS_DIR=$GODOT_DIR/modules/gdnative/include -DCMAKE_BUILD_TYPE=$build_type ../..
+				cmake --build . -j $CORE_COUNT
+				cd ..
+			done
+		fi
 
 		cd ..
 	done
